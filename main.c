@@ -14,7 +14,7 @@
 #define BUF_LEN 1024
 #define IP_STRING_BUF_LEN 16
 #define MAC_STRING_BUF_LEN 18
-#define ARP_PACKET_SIZE 42
+#define ARP_PACKET_SIZE 60
 
 int getLoalAddrInfo(char *ip_buf, char *mac_buf);
 void str2hexMac(char *string_mac, uint8_t *hex_mac);
@@ -31,6 +31,7 @@ int main(int argc, char * argv[])
 	char errbuf[PCAP_ERRBUF_SIZE];	/* Error string */
 	struct pcap_pkthdr *header;	/* The header that pcap gives us */
 	const u_char *packet;		/* The actual packet */
+	int res;
 
 	struct in_addr local_addr;	// for binary tyoe local ip addr
 	
@@ -59,11 +60,43 @@ int main(int argc, char * argv[])
 	if(!getLoalAddrInfo(local_ip_strbuf, local_mac_strbuf))
 		errorHandling("ERROR OCCURED IN getlocalAddrInfo()\n");
 
-
-
-	sendArpPacket(handle, local_mac_strbuf, "00:00:00:00:00:00", local_ip_strbuf, argv[3], ARPOP_REQUEST);
-
 	
+	struct ether_header * ether_packet;
+	struct ether_arp *arp_packet;
+	while(1) {
+		sendArpPacket(handle, local_mac_strbuf, "00:00:00:00:00:00", local_ip_strbuf, argv[2], ARPOP_REQUEST);
+
+		res = pcap_next_ex(handle, &header, &packet);
+		if(res == 0)
+			continue;
+		else if(res == -1)
+			errorHandling("an error occurred while reading the packet\n");
+		else if(res == -2)
+			errorHandling("packets are being read from a ``savefile'' and there are no more packets to read from the savefile");
+	
+		ether_packet = packet;
+
+		if(ether_packet->ether_type != htons(ETHERTYPE_ARP))
+			continue;
+
+		arp_packet = packet + sizeof(struct ether_header);
+		uint8_t buf[4] = {0, };
+		str2hexIp(argv[2], buf);
+		if(memcmp(arp_packet->arp_spa, buf, 4))
+			continue;
+
+		if(arp_packet->ea_hdr.ar_op == htons(ARPOP_REPLY))
+			break;
+		
+
+	}
+	char victim_mac_buf[18] = {0, };
+	sprintf(victim_mac_buf, "%x:%x:%x:%x:%x:%x", arp_packet->arp_sha[0]
+		, arp_packet->arp_sha[1], arp_packet->arp_sha[2], arp_packet->arp_sha[3]
+		, arp_packet->arp_sha[4], arp_packet->arp_sha[5]);
+
+	fprintf(stdout, "[*] target MAC addr\t: %s\n", victim_mac_buf);
+
 	return 0;
 }
 
@@ -120,7 +153,7 @@ void sendArpPacket(pcap_t *p, char *src_mac_buf, char *dest_mac_buf, char *src_i
 	struct ether_header* p_eth;
 	struct ether_arp* p_arp;
 
-	u_char buf[ARP_PACKET_SIZE];
+	u_char buf[ARP_PACKET_SIZE] = {0, };
 	p_eth = (struct ether_header *)buf;
 	p_arp = (struct ether_arp *)(buf + sizeof(struct ether_header));
 
@@ -136,7 +169,10 @@ void sendArpPacket(pcap_t *p, char *src_mac_buf, char *dest_mac_buf, char *src_i
 	str2hexMac(src_mac_buf, src_mac);
 
 	uint8_t dest_mac[6];
-	str2hexMac(dest_mac_buf, dest_mac);
+	if(option == ARPOP_REQUEST)
+		str2hexMac("FF:FF:FF:FF:FF:FF", dest_mac);		
+	else
+		str2hexMac(dest_mac_buf, dest_mac);
 
 	uint8_t src_ip[4];
 	str2hexIp(src_ip_buf, src_ip);
@@ -144,19 +180,19 @@ void sendArpPacket(pcap_t *p, char *src_mac_buf, char *dest_mac_buf, char *src_i
 	uint8_t dest_ip[4];
 	str2hexIp(dest_ip_buf, dest_ip);
 
+
 	// make ether_arp's remains
 	memcpy(p_arp->arp_sha, src_mac, ETH_ALEN);
 	memcpy(p_arp->arp_spa, src_ip, 4);
 	memcpy(p_arp->arp_tha, dest_mac, ETH_ALEN);
 	memcpy(p_arp->arp_tpa, dest_ip, 4);
 
-
 	memcpy(p_eth->ether_dhost, dest_mac, 6);
 	memcpy(p_eth->ether_shost, src_mac, 6);
 	p_eth->ether_type = htons(ETHERTYPE_ARP);
 
 
-	if(-1 == pcap_sendpacket(p, buf, sizeof(struct ether_header) + sizeof(struct ether_arp)))
+	if(-1 == pcap_sendpacket(p, buf, ARP_PACKET_SIZE))
 		errorHandling("Error Occured In pcap_sendpacket");
 	else
 		fprintf(stdout, "[*] sending arp request packet\n");
