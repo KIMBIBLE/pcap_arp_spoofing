@@ -8,10 +8,6 @@
 #include <string.h>
 #include <unistd.h>
 
-//const uint64_t BUF_LEN = 1024;
-//const uint64_t IP_STRING_BUF_LEN = 6;
-//const uint64_t MAC_STRING_BUF_LEN = 18;
-
 #define BUF_LEN 1024
 #define IP_STRING_BUF_LEN 16
 #define MAC_STRING_BUF_LEN 18
